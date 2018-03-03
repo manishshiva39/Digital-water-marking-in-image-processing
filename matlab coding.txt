@@ -1,0 +1,100 @@
+clc;clear all;close all;warning off all;
+
+%% READING INPUT IMAGE
+%% Connect the serial port to Arduino
+clc;
+clear all;
+close all;
+warning off all;
+s = serial('COM4'); % change the COM Port number as needed
+ fopen(s);
+Timeout=360;
+strs=[]
+chr2=[]
+while isempty(strs)
+   strs=fscanf(s)  
+   disp(strs)
+end
+ fid = fopen('ny.txt','wt');
+ strs1=char(strs1)
+ fprintf(fid,strs1);
+ fclose(fid);
+%% read images
+
+[file,path]=uigetfile('*.jpg');
+In_Img=imread([path file]);
+figure(1),
+subplot(131);imshow(In_Img);title('Inputimage');
+Host_In_Img = rgb2gray(In_Img);
+detail_Inform = imfinfo(file);
+if detail_Inform.BitDepth>8
+    Host_im = rgb2gray(In_Img);
+end
+
+detail_Inform.Height = 128;
+detail_Inform.Width = 128;
+Host_im = imresize(Host_im,[detail_Inform.Height,detail_Inform.Width]);
+
+%% COLOR BAND SEPARATION
+
+R=In_Img(:,:,1);
+G=In_Img(:,:,2);
+B=In_Img(:,:,3);
+
+%% BLOCK SPLITTING
+
+fun = @(block_struct) ...
+   std2(block_struct.data) * ones(size(block_struct.data));
+I2 = blockproc(R,[32 32],fun);
+figure,imshow(I2,[])
+
+%% RDH PROCESS 
+%% PARTITIONING INPUT IMAGE INTO 2-PLANES
+
+n=2;
+block{1}=Host_im(:,1:detail_Inform.Height/2);
+block{2}=Host_im(:,detail_Inform.Height/2+1:end);
+
+%% Histogram Shifting
+
+X = inputdlg('Enter Value from 0 to 5');
+L = str2num(X{1});
+P = 2^L;
+H = Host_im;
+location = find(Host_im<P);
+location2 = find(Host_im>(255-P));
+H(location) = P;
+H(location2) = 255-P;
+hist_modified{1}=H(:,1:detail_Inform.Height/2);
+hist_modified{2}=H(:,detail_Inform.Height/2+1:end);
+
+%% Displaying Results
+
+figure(1);
+subplot(132);imshow(block{1});title('A-Plane');
+subplot(133);imshow(block{2});title('B-Plane');
+
+figure(2);
+subplot(221);imhist(block{1});title('A-Plane -original');
+subplot(223);imhist(block{2});title('B-Plane -original');
+subplot(222);imhist(hist_modified{1});title('A-Plane - histogram shifted');
+subplot(224);imhist(hist_modified{2});title('B-Plane -histogram shifted');
+
+figure(3);
+subplot(221);imshow(block{1});title('A-Plane -original');
+subplot(223);imshow(block{2});title('B-Plane -original');
+subplot(222);imshow(hist_modified{1},[]);title('A-Plane - histogram shifted');
+subplot(224);imshow(hist_modified{2},[]);title('B-Plane - histogram shifted');
+
+
+%% Reversible Data Hiding - Data Embedding Process
+
+k1=rdh_embed(Host_In_Img);
+
+%% hardware comments
+
+   S = serial('COM4');
+   fopen(S);
+   fprintf(S,'%s','*1')
+   fclose(S);
+   delete(S);
